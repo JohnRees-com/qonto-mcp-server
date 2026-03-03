@@ -66,3 +66,50 @@ def get_request(request_id: str) -> Dict:
         return response.json()
     except RequestException as e:
         raise RuntimeError(f"Error fetching request: {str(e)}")
+
+@mcp.tool()
+def create_transfer_request(
+    credit_iban: str,
+    credit_account_name: str,
+    amount: str,
+    reference: str,
+    note: Optional[str] = None,
+    debit_iban: Optional[str] = None,
+) -> Dict:
+    """
+    Create a multi transfer request in Qonto. Requires approval in the Qonto app.
+    Args:
+        credit_iban: IBAN of the recipient.
+        credit_account_name: Name of the recipient.
+        amount: Amount to transfer (e.g. "10.00").
+        reference: Payment reference/description.
+        note: Optional note for the approver.
+        debit_iban: Optional IBAN of the Qonto account to debit.
+    Example: create_transfer_request(credit_iban="DE63...", credit_account_name="Max GmbH", amount="10.00", reference="Invoice 01")
+    """
+    import uuid
+    url = f"{qonto_mcp.thirdparty_host}/v2/requests/multi_transfers"
+    payload = {
+        "request_multi_transfer": {
+            "note": note or f"Transfer to {credit_account_name}",
+            "transfers": [
+                {
+                    "amount": amount,
+                    "currency": "EUR",
+                    "credit_iban": credit_iban,
+                    "credit_account_name": credit_account_name,
+                    "credit_account_currency": "EUR",
+                    "reference": reference,
+                }
+            ],
+        }
+    }
+    if debit_iban:
+        payload["request_multi_transfer"]["debit_iban"] = debit_iban
+    headers = {**qonto_mcp.headers, "X-Qonto-Idempotency-Key": str(uuid.uuid4())}
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+    except RequestException as e:
+        raise RuntimeError(f"Error creating transfer request: {str(e)}")
