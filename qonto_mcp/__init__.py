@@ -31,7 +31,7 @@ def setup_qonto_config():
 
     headers = {
         "Accept": "application/json",
-        "Authorization": f"{organization_id}:{api_key}",
+        "Authorization": f"{api_key}",
     }
 
     if staging_token:
