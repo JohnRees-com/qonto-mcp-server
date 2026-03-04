@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import argparse
 import logging
+import os
 import qonto_mcp
 from qonto_mcp import mcp
 
@@ -26,6 +27,17 @@ qonto_mcp.setup_qonto_config()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def make_auth_middleware(token: str):
+    async def auth_middleware(request, call_next):
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {token}":
+            from starlette.responses import Response
+            return Response("Unauthorized", status_code=401)
+        return await call_next(request)
+    return auth_middleware
+
 
 if __name__ == "__main__":
     # --- argument parsing ---------------------------------------------------
@@ -55,5 +67,11 @@ if __name__ == "__main__":
         "We recommend to only use MCP servers you trust, just as you would with any software you install."
     )
     logger.info("Find out more details in the `README.md` of this repository.")
+
+    # Add Bearer token auth middleware if MCP_AUTH_TOKEN is set
+    auth_token = os.environ.get("MCP_AUTH_TOKEN")
+    if auth_token and args.transport == "streamable-http":
+        mcp.custom_middleware = [make_auth_middleware(auth_token)]
+        logger.info("🔒 Bearer token authentication enabled.")
 
     mcp.run(transport=args.transport)
